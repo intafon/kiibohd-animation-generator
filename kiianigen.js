@@ -57,6 +57,9 @@ function main() {
                           .readFileSync(srcConfigDir + '/KType-Standard.json', 'utf8'));
 
     // The current animations
+    if (!json.animations) {
+        json.animations = {};
+    }
     var animOrig = json.animations;
 
     // Information about the leds
