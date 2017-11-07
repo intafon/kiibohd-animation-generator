@@ -1,0 +1,19 @@
+{
+  "name": "ktype-frame-generator",
+  "version": "1.0.0",
+  "description": "Used to generate animation frames for k-type keyboard.",
+  "main": "framegen.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "ktype",
+    "inputclub",
+    "keyboards"
+  ],
+  "author": "uɐʎɹ ррoʇ uɐʎɹ",
+  "license": "ISC",
+  "dependencies": {
+    "dateformat": "^3.0.2"
+  }
+}

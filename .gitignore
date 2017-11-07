@@ -57,3 +57,11 @@ typings/
 # dotenv environment variables file
 .env
 
+# kiibohd stuff not needed for this project
+json_out
+kiibohd.secure.dfu.bin
+kiibohd.dfu.bin
+log
+kll
+KType-Standard-0.kll
+KType-Standard-1.kll
