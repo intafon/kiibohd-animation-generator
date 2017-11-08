@@ -3,9 +3,9 @@ Node.js script for generating animations for kiibohd configurator import
 
 TODO: add more here...
 
-This requires node and npm to run. In order to use, cd to the repo directory and run "``npm install``", and then you can run "``node kiianigen.js {generator name} {ktype standard dir}``". See documentation in kiianigen.js script for more details on usage.
+This requires node and npm to run. In order to use, cd to the repo directory and run "``npm install``", and then you can run "``node kiianigen.js {generator name} {ktype standard dir}``". See documentation in kiianigen.js script for more details on usage. Note that at this time, the arguments are positional, and at least the generator name is required (unless you wish to see the generator names, as detailed below).
 
-Generator names can be found in the "generators" object definition in the kiianigen.js file.
+Generator names can be found in the "generators" object definition in the kiianigen.js file, or by invoking "``node kiianigen.js``" with no specified generator. This will print out all available generators.
 
 Workflow:
 1. Run kiibohd configurator and output the configuration the way you like it (such as swapped keys for mac, etc. etc.)

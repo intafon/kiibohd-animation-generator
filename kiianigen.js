@@ -25,7 +25,10 @@ var fs = require("fs");
 var dateFormat = require('dateformat');
 
 // Get the generator to be used.
-var generator = process.argv[2].trim();
+var generator = process.argv[2];
+if (generator) {
+    generator = generator.trim();
+}
 
 var maxRow = 0;
 var maxCol = 0;
@@ -39,6 +42,12 @@ var json, leds, blankLeds, keyedLeds, kll;
 function main() {
     var i;
 
+    // Test multicolor bleed interpolations
+    // console.info("linear\n", multiColorBleed(20, linearInterpolate, [0,0,0], [20,20,20]));
+    // console.info("sine\n", multiColorBleed(20, sineInterpolate, [0,0,0], [20,20,20]));
+    // console.info("random\n", multiColorBleed(20, randomInterpolate, [0,0,0], [20,20,20]));
+    // return;
+
     // If the source KType-Standard directory is different from ../KType-Standard, then it must be
     // the secondary argument.
     var srcConfigDir = "../KType-Standard";
@@ -49,6 +58,10 @@ function main() {
     // If no generator is provided, then bail out.
     if (!generator || (!generators[generator] && generator !== 'all')) {
         console.info("Unknown generator: ", generator);
+        var gens = Object.keys(generators);
+        gens.unshift('');
+        console.info("Either specify 'all' or use one of the following generators:" +
+                     gens.join("\n\t"));
         return;
     }
 
@@ -192,6 +205,33 @@ var getPixel = function(row,col,r,g,b, pixelNumber) {
 };
 
 /**
+ * Gets a numeric value somewhere between 2 other numeric values, given a step and a total number
+ * of steps to be travelled between those values, in a linear fashion.
+ */
+function linearInterpolate(step, steps, val1, val2) {
+    return (val2 - val1) * (step / steps) + val1;
+}
+
+/**
+ * Gets a numeric value somewhere between 2 other numeric values, given a step and a total number
+ * of steps to be travelled between those values, in a fashion akin to travelling along the sine
+ * curve between -PI/2 and PI/2.
+ */
+function sineInterpolate(step, steps, val1, val2) {
+    var angle = (step / steps) * Math.PI - (Math.PI / 2);
+    var sine = Math.sin(angle);
+    var interpolateVal = (sine + 1) / 2;
+    return (val2 - val1) * interpolateVal + val1;
+}
+
+/**
+ * Gets a random numeric value between 2 other values.
+ */
+function randomInterpolate(step, steps, val1, val2) {
+    return (val2 - val1) * Math.random() + val1;
+}
+
+/**
  * Returns a color in between the origin color and the destination color, based on the number of
  * steps over which the color should bleed and the step number for which the returned value should
  * represent. If no steps or step is provided, then the function simply returns the color value
@@ -207,36 +247,41 @@ var getPixel = function(row,col,r,g,b, pixelNumber) {
  *         is 2. i.e. origin color (0), avg color (1), destination color (2)
  * @param  {Number} step
  *         The step index value for the return value.
+ * @param  {Function} interpolateFunc
+ *         The function to be used for interpolating between the values. Default used is the
+ *         linearInterpolate function.
  * @return {Array}
  *         An array of arrays of r,g,b color values representing the full bleed.
  */
-var colorBleed = function(origColor, destColor, steps, step) {
+function colorBleed(origColor, destColor, steps, step, interpolateFunc) {
     if (steps === undefined || steps < 2) {
         steps = 2;
         step = 1;
     }
-    var i;
-    var diffSteps = [];
-    for (i = 0; i < origColor.length; i++) {
-        var cDiff = destColor[i] - origColor[i];
-        diffSteps[i] = cDiff / steps;
+    if (interpolateFunc === undefined) {
+        interpolateFunc = linearInterpolate;
     }
+    var i;
     var colors = [];
     for (var s = 0; s <= steps; s++) {
-        var color = [];
-        for (i = 0; i < origColor.length; i++) {
-            var iColor = Math.round(origColor[i] + (s * diffSteps[i]));
-            iColor = Math.max(iColor, 0);
-            iColor = Math.min(iColor, 255);
-            color.push(iColor);
-        }
+        /*jshint loopfunc: true */
+        var color = origColor.map(function(origChannel, idx) {
+            var destChannel = destColor[idx];
+            var val = interpolateFunc(s, steps, origChannel, destChannel);
+            // Round the numbers? Does it matter?
+            val = Math.round(val);
+            // ensure the color channel value is between 0 - 255
+            val = Math.max(val, 0);
+            val = Math.min(val, 255);
+            return val;
+        });
         colors.push(color);
     }
-    if (step !== undefined) {
+    if (step !== undefined && step !== null) {
         return colors[step];
     }
     return colors;
-};
+}
 
 /**
  * Creates an array of color values representing a gradual fade between multiple colors. Usage:
@@ -244,13 +289,15 @@ var colorBleed = function(origColor, destColor, steps, step) {
  *
  * @param  {Number} frameCountPerColor
  *         The number of frames used to get from one color to the next.
+ * @param  {Function} interpolateFunc
+ *         The function used for interpolating between the values.
  * @param  ...args
  *         The colors that should be animated, as arrays of [r,g,b].
  * @return {Array}
  *         The array of colors.
  */
-var multiColorBleed = function(frameCountPerColor) {
-    var colorValues = Array.prototype.slice.call(arguments, 1);
+function multiColorBleed(frameCountPerColor, interpolateFunc) {
+    var colorValues = Array.prototype.slice.call(arguments, 2);
     var colors = [];
     var i;
     for (i = 0; i < colorValues.length; i++) {
@@ -261,7 +308,7 @@ var multiColorBleed = function(frameCountPerColor) {
         } else {
             cDest = colorValues[i + 1];
         }
-        var fade = colorBleed(cOrig, cDest, frameCountPerColor);
+        var fade = colorBleed(cOrig, cDest, frameCountPerColor, null, interpolateFunc);
         if (i > 0) {
             fade = fade.slice(1);
         }
@@ -269,7 +316,7 @@ var multiColorBleed = function(frameCountPerColor) {
     }
     colors.pop();
     return colors;
-};
+}
 
 /**
  * Creates an animation for pulsing between colors, using multiColorBleed to generate the array of
@@ -283,8 +330,8 @@ var multiColorBleed = function(frameCountPerColor) {
  *         An animation object.
  */
 function colorPulseGenerator(frameCountPerColor) {
-    var args = Array.prototype.slice.call(arguments, 0);
-    var colors = multiColorBleed.apply(null, args);
+    var args = Array.prototype.slice.call(arguments, 1);
+    var colors = multiColorBleed.apply(null, [frameCountPerColor, undefined].concat(args));
 
     var animation = {
         "settings": "framedelay:3, framestretch, loop, replace:all, pfunc:interp",
@@ -304,6 +351,37 @@ function colorPulseGenerator(frameCountPerColor) {
     animation.frames = frames;
     return animation;
 }
+
+/**
+ * Creates an animation in which colors pulse from one to another with breath-like cadence.
+ */
+function colorBreatheGenerator(breathsPerMinute) {
+    var FRAME_DELAY = 3;
+    var secondsPerBreath = 60 / breathsPerMinute;
+    // Divide by 2 below so that the steps from one color to another is the inhale of a breath.
+    var stepsPerInhale = (secondsPerBreath * 100 / FRAME_DELAY) / 2;
+    var colorValues = Array.prototype.slice.call(arguments, 1);
+    var colors = multiColorBleed.apply(null, [stepsPerInhale, sineInterpolate].concat(colorValues));
+
+    var animation = {
+        "settings": "framedelay:" + FRAME_DELAY + ", framestretch, loop, replace:all, pfunc:interp",
+        "type": "animation",
+        "frames": []
+    };
+
+    var frames = [];
+    var frame, color;
+    for (var i = 0; i < colors.length; i++) {
+        frame = [];
+        color = colors[i];
+        frame.push(getPixel(null, "-1%", color[0], color[1], color[2]));
+        frame.push(getPixel(null, "101%", color[0], color[1], color[2]));
+        frames.push(frame.join(","));
+    }
+    animation.frames = frames;
+    return animation;
+}
+
 
 // The generators are an object map of animation generators.
 var generators = {
@@ -360,21 +438,57 @@ var generators = {
         for (var i = -overflow; i < steps + overflow + 1; i++) {
             frame = [];
             frame.push(getPixel(null, -2 + "%", bgColor[0], bgColor[1], bgColor[2]));
-            frame.push(getPixel(null, ((i - overflow - (bleed - 1)) * step) + "%", lastBleedColor[0], lastBleedColor[1], lastBleedColor[2]));
-            frame.push(getPixel(null, ((i - overflow) * step) + "%", hiColor[0], hiColor[1], hiColor[2]));
-            frame.push(getPixel(null, ((i - overflow + (bleed - 1)) * step) + "%", lastBleedColor[0], lastBleedColor[1], lastBleedColor[2]));
-            frame.push(getPixel(null, 102 + "%", bgColor[0], bgColor[1], bgColor[2]));
+            frame.push(getPixel(null,
+                                ((i - overflow - (bleed - 1)) * step) + "%",
+                                lastBleedColor[0],
+                                lastBleedColor[1],
+                                lastBleedColor[2]));
+            frame.push(getPixel(null,
+                                ((i - overflow) * step) + "%",
+                                hiColor[0],
+                                hiColor[1],
+                                hiColor[2]));
+            frame.push(getPixel(null,
+                                ((i - overflow + (bleed - 1)) * step) + "%",
+                                lastBleedColor[0],
+                                lastBleedColor[1],
+                                lastBleedColor[2]));
+            frame.push(getPixel(null,
+                                102 + "%",
+                                bgColor[0],
+                                bgColor[1],
+                                bgColor[2]));
 
             frames.push(frame.join(","));
         }
         for (i = steps + overflow + 1; i > -overflow - 1; i--) {
             frame = [];
 
-            frame.push(getPixel(null, -2 + "%", bgColor[0], bgColor[1], bgColor[2]));
-            frame.push(getPixel(null, ((i - overflow - (bleed - 1)) * step) + "%", lastBleedColor[0], lastBleedColor[1], lastBleedColor[2]));
-            frame.push(getPixel(null, ((i - overflow) * step) + "%", hiColor[0], hiColor[1], hiColor[2]));
-            frame.push(getPixel(null, ((i - overflow + (bleed - 1)) * step) + "%", lastBleedColor[0], lastBleedColor[1], lastBleedColor[2]));
-            frame.push(getPixel(null, 102 + "%", bgColor[0], bgColor[1], bgColor[2]));
+            frame.push(getPixel(null, -
+                                2 + "%",
+                                bgColor[0],
+                                bgColor[1],
+                                bgColor[2]));
+            frame.push(getPixel(null,
+                                ((i - overflow - (bleed - 1)) * step) + "%",
+                                lastBleedColor[0],
+                                lastBleedColor[1],
+                                lastBleedColor[2]));
+            frame.push(getPixel(null,
+                                ((i - overflow) * step) + "%",
+                                hiColor[0],
+                                hiColor[1],
+                                hiColor[2]));
+            frame.push(getPixel(null,
+                                ((i - overflow + (bleed - 1)) * step) + "%",
+                                lastBleedColor[0],
+                                lastBleedColor[1],
+                                lastBleedColor[2]));
+            frame.push(getPixel(null,
+                                102 + "%",
+                                bgColor[0],
+                                bgColor[1],
+                                bgColor[2]));
 
             frames.push(frame.join(","));
         }
@@ -407,17 +521,39 @@ var generators = {
         var j;
         for (var i = -overflow; i < steps + overflow + 1; i++) {
             frame = [];
-            frame.push(getPixel(-2 + "%", null, bgColor[0], bgColor[1], bgColor[2]));
-            frame.push(getPixel(((i - overflow) * step) + "%", null, hiColor[0], hiColor[1], hiColor[2]));
-            frame.push(getPixel(102 + "%", null, bgColor[0], bgColor[1], bgColor[2]));
+            frame.push(getPixel(-2 + "%", null,
+                                bgColor[0],
+                                bgColor[1],
+                                bgColor[2]));
+            frame.push(getPixel(((i - overflow) * step) + "%",
+                                null,
+                                hiColor[0],
+                                hiColor[1],
+                                hiColor[2]));
+            frame.push(getPixel(102 + "%", null,
+                                bgColor[0],
+                                bgColor[1],
+                                bgColor[2]));
 
             frames.push(frame.join(","));
         }
         for (i = steps + overflow + 1; i > -overflow - 1; i--) {
             frame = [];
-            frame.push(getPixel(-2 + "%", bgColor[0], null, bgColor[1], bgColor[2]));
-            frame.push(getPixel(((i - overflow) * step) + "%", null, hiColor[0], hiColor[1], hiColor[2]));
-            frame.push(getPixel(102 + "%", null, bgColor[0], bgColor[1], bgColor[2]));
+            frame.push(getPixel(-2 + "%",
+                                bgColor[0],
+                                null,
+                                bgColor[1],
+                                bgColor[2]));
+            frame.push(getPixel(((i - overflow) * step) + "%",
+                                null,
+                                hiColor[0],
+                                hiColor[1],
+                                hiColor[2]));
+            frame.push(getPixel(102 + "%",
+                                null,
+                                bgColor[0],
+                                bgColor[1],
+                                bgColor[2]));
             frames.push(frame.join(","));
         }
         animation.frames = frames;
@@ -427,7 +563,21 @@ var generators = {
     /**
      * Pulse the entire keyboard red.
      */
-    "redPulse": function(maxFrames) {
+    "macSleepBreath": function() {
+        return colorBreatheGenerator(12, [255, 255, 255], [1, 1, 1]);
+    },
+
+    /**
+     * Pulse the entire keyboard red.
+     */
+    "blueGreenBreath": function() {
+        return colorBreatheGenerator(12, [0, 255, 0], [0, 0, 255]);
+    },
+
+    /**
+     * Pulse the entire keyboard red.
+     */
+    "redPulse": function() {
         return colorPulseGenerator(240, [255, 25, 0], [0, 0, 0]);
     },
 
@@ -449,7 +599,13 @@ var generators = {
      * Pulse the entire keyboard red to green to blue with white in between.
      */
     "rgbZebraPulse": function() {
-        return colorPulseGenerator(120, [255, 0, 0], [255, 255, 255], [0, 255, 0], [255, 255, 255], [0, 0, 255], [255, 255, 255]);
+        return colorPulseGenerator(120,
+                                   [255, 0, 0],
+                                   [255, 255, 255],
+                                   [0, 255, 0],
+                                   [255, 255, 255],
+                                   [0, 0, 255],
+                                   [255, 255, 255]);
     },
 
     /**
@@ -487,6 +643,7 @@ var generators = {
      * in this case, the base leds are green and the keys are blue.
      */
     "topAndBottom": function() {
+        var i;
         var animation = {
             "settings": "framedelay:1, loop, replace:all",
             "type": "animation",
@@ -494,10 +651,10 @@ var generators = {
         };
         var frames = [];
         var frame = [];
-        for (var i = 0; i < blankLeds.length; i++) {
+        for (i = 0; i < blankLeds.length; i++) {
             frame.push(getPixel(null, null, 0, 255, 0, blankLeds[i].id));
         }
-        for (var i = 0; i < keyedLeds.length; i++) {
+        for (i = 0; i < keyedLeds.length; i++) {
             frame.push(getPixel(null, null, 0, 0, 255, keyedLeds[i].id));
         }
         frames.push(frame.join(","));
@@ -518,8 +675,18 @@ var generators = {
         var frames = [];
         for (var i = 0; i < 10; i++) {
             var frame = [];
-            frame.push(getPixel(null, null, Math.floor(Math.random() * 255), Math.floor(Math.random() * 0), Math.floor(Math.random() * 0), 1));
-            frame.push(getPixel(null, null, Math.floor(Math.random() * 255), Math.floor(Math.random() * 0), Math.floor(Math.random() * 0), 16));
+            frame.push(getPixel(null,
+                                null,
+                                Math.floor(Math.random() * 255),
+                                Math.floor(Math.random() * 0),
+                                Math.floor(Math.random() * 0),
+                                1));
+            frame.push(getPixel(null,
+                                null,
+                                Math.floor(Math.random() * 255),
+                                Math.floor(Math.random() * 0),
+                                Math.floor(Math.random() * 0),
+                                16));
             frames.push(frame.join(","));
         }
 
