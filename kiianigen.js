@@ -577,6 +577,53 @@ var generators = {
     /**
      * Pulse the entire keyboard red.
      */
+    "blueGreenBaseTopBreath": function() {
+        var breathsPerMinute = 12;
+        var FRAME_DELAY = 3;
+        var secondsPerBreath = 60 / breathsPerMinute;
+        // Divide by 2 below so that the steps from one color to another is the inhale of a breath.
+        var stepsPerInhale = (secondsPerBreath * 100 / FRAME_DELAY) / 2;
+        var colorValues = Array.prototype.slice.call(arguments, 1);
+        var topColors = multiColorBleed(stepsPerInhale, sineInterpolate, [0, 255, 0], [0, 0, 255]);
+        var botColors = multiColorBleed(stepsPerInhale, sineInterpolate, [0, 0, 255], [0, 255, 0]);
+
+        var animation = {
+            "settings": "framedelay:" + FRAME_DELAY +
+                        ", framestretch, loop, replace:all, pfunc:interp",
+            "type": "animation",
+            "frames": []
+        };
+
+        var i, p;
+        var frames = [];
+        var frame, color;
+        for (var i = 0; i < topColors.length; i++) {
+            frame = [];
+            var botColor = botColors[i];
+            var topColor = topColors[i];
+            // This is not the way to do this -- as it dies in the configurator output phase...
+            // for (p = 0; p < blankLeds.length; p++) {
+            //     frame.push(getPixel(null, null, botColor[0], botColor[1],
+            //                         botColor[2], blankLeds[p].id));
+            // }
+            // for (p = 0; p < keyedLeds.length; p++) {
+            //     frame.push(getPixel(null, null, topColor[0], topColor[1],
+            //                         topColor[2], keyedLeds[p].id));
+            // }
+            // Do interpolation between the top keys and bottom keys
+            frame.push(getPixel(null, null, topColor[0], topColor[1], topColor[2], 1));
+            frame.push(getPixel(null, null, topColor[0], topColor[1], topColor[2], 87));
+            frame.push(getPixel(null, null, botColor[0], botColor[1], botColor[2], 88));
+            frame.push(getPixel(null, null, botColor[0], botColor[1], botColor[2], 119));
+            frames.push(frame.join(","));
+        }
+        animation.frames = frames;
+        return animation;
+    },
+
+    /**
+     * Pulse the entire keyboard red.
+     */
     "redPulse": function() {
         return colorPulseGenerator(240, [255, 25, 0], [0, 0, 0]);
     },
@@ -645,7 +692,7 @@ var generators = {
     "topAndBottom": function() {
         var i;
         var animation = {
-            "settings": "framedelay:1, loop, replace:all",
+            "settings": "framedelay:5, loop, replace:all",
             "type": "animation",
             "frames": []
         };
