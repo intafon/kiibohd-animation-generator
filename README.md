@@ -7,6 +7,8 @@ This requires node and npm to run. In order to use, cd to the repo directory and
 
 Generator names can be found in the "generators" object definition in the kiianigen.js file, or by invoking "``node kiianigen.js``" with no specified generator. This will print out all available generators.
 
+NOTE: At this point I would not recommend running with "all" generators unless you comment out some of them. I've had issues flashing the keyboard with all the current animations, haven't had time to figure out why that is.
+
 Workflow:
 1. Run kiibohd configurator and output the configuration the way you like it (such as swapped keys for mac, etc. etc.)
 2. Move that configurator generated directory next to the directory for kiibohd-animation-generator named "KType-Standard"
