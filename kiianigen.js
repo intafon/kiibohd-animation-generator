@@ -382,6 +382,17 @@ function colorBreatheGenerator(breathsPerMinute) {
     return animation;
 }
 
+/**
+ * Normalizes a color value to be an integer between 0 and 255.
+ * @param  {Number} colorVal
+ *         The color values to normalize.
+ * @return {Number}
+ *         The normalized value.
+ */
+function normColor(colorVal) {
+    return Math.max(Math.min(Math.round(colorVal), 255), 0);
+}
+
 
 // The generators are an object map of animation generators.
 var generators = {
@@ -575,12 +586,12 @@ var generators = {
     },
 
     /**
-     * Pulse the entire keyboard red.
+     * Pulse the keyboard top and bottom alternating blue and green.
      */
     "blueGreenBaseTopBreath": function() {
         var breathsPerMinute = 12;
         var FRAME_DELAY = 3;
-        var secondsPerBreath = 60 / breathsPerMinute;
+        var secondsPerBreath = Math.round(60 / breathsPerMinute);
         // Divide by 2 below so that the steps from one color to another is the inhale of a breath.
         var stepsPerInhale = (secondsPerBreath * 100 / FRAME_DELAY) / 2;
         var colorValues = Array.prototype.slice.call(arguments, 1);
@@ -597,7 +608,7 @@ var generators = {
         var i, p;
         var frames = [];
         var frame, color;
-        for (var i = 0; i < topColors.length; i++) {
+        for (i = 0; i < topColors.length; i++) {
             frame = [];
             var botColor = botColors[i];
             var topColor = topColors[i];
@@ -615,6 +626,68 @@ var generators = {
             frame.push(getPixel(null, null, topColor[0], topColor[1], topColor[2], 87));
             frame.push(getPixel(null, null, botColor[0], botColor[1], botColor[2], 88));
             frame.push(getPixel(null, null, botColor[0], botColor[1], botColor[2], 119));
+            frames.push(frame.join(","));
+        }
+        animation.frames = frames;
+        return animation;
+    },
+
+    /**
+     * Pulse the keyboard top and bottom alternating blue and green, with a base spin.
+     */
+    "blueGreenBaseTopBreathSpin": function() {
+        var breathsPerMinute = 12;
+        var FRAME_DELAY = 10;//3;
+        var secondsPerBreath = 6.4;//Math.round(60 / breathsPerMinute);
+        // Divide by 2 below so that the steps from one color to another is the inhale of a breath.
+        var stepsPerInhale = (secondsPerBreath * 100 / FRAME_DELAY) / 2;
+        var colorValues = Array.prototype.slice.call(arguments, 1);
+        var topColors = multiColorBleed(stepsPerInhale, sineInterpolate, [0, 255, 0], [0, 0, 255]);
+        var botColors = multiColorBleed(stepsPerInhale, sineInterpolate, [0, 0, 255], [0, 255, 0]);
+
+        // 32 = secondsPerBreath * 100 / FRAME_DELAY / 2
+        // 64 = secondsPerBreath * 100 / FRAME_DELAY
+        // 64 * FRAME_DELAY = secondsPerBreath * 100
+
+        var animation = {
+            "settings": "framedelay:" + FRAME_DELAY +
+                        ", framestretch, loop, replace:all, pfunc:interp",
+            "type": "animation",
+            "frames": []
+        };
+
+        var i, p;
+        var frames = [];
+        var baseIds = [];
+        for (i = 88; i <= 119; i++) {
+            baseIds.push(i);
+        }
+        var frame, color;
+        for (i = 0; i < topColors.length; i++) {
+            frame = [];
+            var botColor = botColors[i];
+            var topColor = topColors[i];
+
+            // Do keyboard color
+            frame.push(getPixel(null, null, topColor[0], topColor[1], topColor[2], 1));
+            frame.push(getPixel(null, null, topColor[0], topColor[1], topColor[2], 87));
+            // frame.push(getPixel(null, null, botColor[0], botColor[1], botColor[2], 88));
+            // frame.push(getPixel(null, null, botColor[0], botColor[1], botColor[2], 119));
+
+            // color the base
+            var popped = baseIds.pop();
+            baseIds.unshift(popped);
+            var steps = 119 - 88;
+            for (var j = 0; j < baseIds.length; j++) {
+                var perc = j / baseIds.length;
+                frame.push(getPixel(null,
+                                    null,
+                                    normColor(botColor[0] * perc),
+                                    normColor(botColor[1] * perc),
+                                    normColor(botColor[2] * perc),
+                                    baseIds[j]));
+            }
+
             frames.push(frame.join(","));
         }
         animation.frames = frames;
@@ -705,6 +778,50 @@ var generators = {
             frame.push(getPixel(null, null, 0, 0, 255, keyedLeds[i].id));
         }
         frames.push(frame.join(","));
+        animation.frames = frames;
+        return animation;
+    },
+
+    /**
+     * An example using the led data to fill in the pixels for the base and the keys differently;
+     * in this case, the base leds are green and the keys are blue.
+     */
+    "topAndBottom2": function() {
+        var i;
+        var animation = {
+            "settings": "framedelay:5, loop, replace:all, pfunc:interp",
+            "type": "animation",
+            "frames": []
+        };
+        var topColor = [0,255,0];
+        var botColor = [0,0,255];
+        var frames = [];
+        var ids = [];
+        for (i = 88; i <= 119; i++) {
+            ids.push(i);
+        }
+        for (i = 88; i <= 119; i++) {
+            var frame = [];
+            // color the top
+            frame.push(getPixel(null, null, topColor[0], topColor[1], topColor[2], 1));
+            frame.push(getPixel(null, null, topColor[0], topColor[1], topColor[2], 87));
+
+            // color the base
+            var popped = ids.pop();
+            ids.unshift(popped);
+            var steps = 119 - 88;
+            for (var j = 0; j < ids.length; j++) {
+                var perc = j / ids.length;
+                frame.push(getPixel(null,
+                                    null,
+                                    normColor(botColor[0] * perc),
+                                    normColor(botColor[1] * perc),
+                                    normColor(botColor[2] * perc),
+                                    ids[j]));
+            }
+            frames.push(frame.join(","));
+        }
+
         animation.frames = frames;
         return animation;
     },
