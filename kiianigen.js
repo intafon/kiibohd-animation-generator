@@ -30,9 +30,44 @@ if (generator) {
     generator = generator.trim();
 }
 
+var CONF_FILE = "./kiianiconf.json";
+
 var maxRow = 0;
 var maxCol = 0;
 var json, leds, blankLeds, keyedLeds, kll;
+
+// The demo configuration that is written to kiianiconf.json if one does not exist when running
+// with the "conf" option.
+var DEMO_CONF = {
+    "animations": {
+        "KARR 1.0": {
+            "generator": "kitt2000",
+            "params": [[255, 102, 0]]
+        },
+        "KITT 2000": {
+            "generator": "kitt2000",
+            "params": []
+        },
+        "White Noise": {
+            "generator": "whiteNoise"
+        },
+        "Turquoise Hexagon Sun": {
+            "generator": "baseTopBreath",
+            "params": [[0, 255, 0], [0, 0, 255]]
+        },
+        "Iced Cooly": {
+            "generator": "dodgyPixel",
+            "params": [[204, 204, 204], [0, 0, 255]]
+        }
+    },
+    "activeAnimations": [
+        "KARR 1.0",
+        "KITT 2000",
+        "Turquoise Hexagon Sun",
+        "Iced Cooly",
+        "White Noise"
+    ]
+};
 
 /**
  * The main function for the script. This basically opens a few of the files from the
@@ -56,11 +91,11 @@ function main() {
     }
 
     // If no generator is provided, then bail out.
-    if (!generator || (!generators[generator] && generator !== 'all')) {
+    if (!generator || (!generators[generator] && generator !== 'all' && generator !== 'conf')) {
         console.info("Unknown generator: ", generator);
         var gens = Object.keys(generators);
         gens.unshift('');
-        console.info("Either specify 'all' or use one of the following generators:" +
+        console.info("Either specify 'all', 'conf', or use one of the following generators:" +
                      gens.join("\n\t"));
         return;
     }
@@ -102,6 +137,15 @@ function main() {
                 animOrig[g] = generators[g]();
             }
         }
+    } else if (generator === 'conf') {
+        var confData;
+        if (!fs.existsSync(CONF_FILE)) {
+            confData = DEMO_CONF;
+            fs.writeFileSync(CONF_FILE, JSON.stringify(DEMO_CONF, null, 4));
+        } else {
+            confData = JSON.parse(require('fs').readFileSync(CONF_FILE, 'utf8'));
+        }
+        generateFromConf(animOrig, confData);
     } else {
         animOrig[generator] = generators[generator]();
     }
@@ -165,6 +209,35 @@ function main() {
 
     console.info("move output to KType-Standard.json and run 'dfu-util " +
                  "-D kiibohd.dfu.bin' to flash keyboard");
+}
+
+/**
+ * Generates animations based on the kiianiconf.json file specifications.
+ * @param  {Object} animOrig
+ *         The original animations object.
+ * @param  {Object} confData
+ *         The kiianiconf.json data.
+ */
+function generateFromConf(animOrig, confData) {
+    // TODO: come up with a way to verify that the confData parameters specified for the given
+    // animations actually make sense...
+
+    // var anims = [];
+    // var animNames = [];
+    var i;
+    for (i = 0; i < confData.activeAnimations.length; i++) {
+        var animName = confData.activeAnimations[i];
+        var anim = confData.animations[animName];
+        var gen = generators[anim.generator];
+        var params = anim.params;
+        // We have to use single word names for the animations in the configurator
+        var animNameToUse = animName.replace(/\s+/g, '_').replace(/\W+/g,'');
+        if (params) {
+            animOrig[animNameToUse] = gen.apply(null, params);
+        } else {
+            animOrig[animNameToUse] = gen();
+        }
+    }
 }
 
 /**
@@ -400,7 +473,13 @@ var generators = {
     /**
      * Blinks random keys.
      */
-    "dodgyPixel": function() {
+    "dodgyPixel": function(hiColor, bgColor) {
+        if (!hiColor) {
+            hiColor = [255, 255, 255];
+        }
+        if (!bgColor) {
+            bgColor = [25, 25, 25];
+        }
         var animation = {
             "settings": "framedelay:1, loop, replace:all",
             "type": "animation",
@@ -410,15 +489,15 @@ var generators = {
         var frame = [];
         for (var x = 0; x <= maxRow; x++) {
             for (var y = 0; y <= maxCol; y++) {
-                frame.push(getPixel(x, y, 25, 25, 25));
+                frame.push(getPixel(x, y, bgColor[0], bgColor[1], bgColor[2]));
             }
         }
         frames.push(frame.join(","));
         for (var i = 0; i < 50; i++) {
             var rx = Math.round(Math.random() * maxRow);
             var ry = Math.round(Math.random() * maxCol);
-            frames.push(getPixel(rx, ry, 255, 255, 255));
-            frames.push(getPixel(rx, ry, 25, 25, 25));
+            frames.push(getPixel(rx, ry, hiColor[0], hiColor[1], hiColor[2]));
+            frames.push(getPixel(rx, ry, bgColor[0], bgColor[1], bgColor[2]));
         }
         animation.frames = frames;
         return animation;
@@ -427,14 +506,19 @@ var generators = {
     /**
      * Makes your keyboard look vaguely like Kitt 200 from Knight Rider.
      */
-    "kitt2000": function() {
+    "kitt2000": function(hiColor, bgColor) {
+        if (!hiColor) {
+            hiColor = [255, 0, 0];
+        }
+        if (!bgColor) {
+            bgColor = [0, 0, 0];
+        }
+
         var animation = {
             "settings": "framedelay:3, framestretch, loop, replace:all, pfunc:interp",
             "type": "animation",
             "frames": []
         };
-        var bgColor = [0, 0, 0];
-        var hiColor = [255, 26, 0];
         // Number of columns over which to bleed to bg color.
         var bleed = 5;
         var bleedColors = colorBleed(hiColor, bgColor, bleed);
@@ -574,8 +658,14 @@ var generators = {
     /**
      * Pulse the entire keyboard red.
      */
-    "macSleepBreath": function() {
-        return colorBreatheGenerator(12, [255, 255, 255], [1, 1, 1]);
+    "macSleepBreath": function(hiColor, loColor) {
+        if (!hiColor) {
+            hiColor = [255, 255, 255];
+        }
+        if (!loColor) {
+            loColor = [1, 1, 1];
+        }
+        return colorBreatheGenerator(12, hiColor, loColor);
     },
 
     /**
@@ -583,53 +673,6 @@ var generators = {
      */
     "blueGreenBreath": function() {
         return colorBreatheGenerator(12, [0, 255, 0], [0, 0, 255]);
-    },
-
-    /**
-     * Pulse the keyboard top and bottom alternating blue and green.
-     */
-    "blueGreenBaseTopBreath": function() {
-        var breathsPerMinute = 12;
-        var FRAME_DELAY = 3;
-        var secondsPerBreath = Math.round(60 / breathsPerMinute);
-        // Divide by 2 below so that the steps from one color to another is the inhale of a breath.
-        var stepsPerInhale = (secondsPerBreath * 100 / FRAME_DELAY) / 2;
-        var colorValues = Array.prototype.slice.call(arguments, 1);
-        var topColors = multiColorBleed(stepsPerInhale, sineInterpolate, [0, 255, 0], [0, 0, 255]);
-        var botColors = multiColorBleed(stepsPerInhale, sineInterpolate, [0, 0, 255], [0, 255, 0]);
-
-        var animation = {
-            "settings": "framedelay:" + FRAME_DELAY +
-                        ", framestretch, loop, replace:all, pfunc:interp",
-            "type": "animation",
-            "frames": []
-        };
-
-        var i, p;
-        var frames = [];
-        var frame, color;
-        for (i = 0; i < topColors.length; i++) {
-            frame = [];
-            var botColor = botColors[i];
-            var topColor = topColors[i];
-            // This is not the way to do this -- as it dies in the configurator output phase...
-            // for (p = 0; p < blankLeds.length; p++) {
-            //     frame.push(getPixel(null, null, botColor[0], botColor[1],
-            //                         botColor[2], blankLeds[p].id));
-            // }
-            // for (p = 0; p < keyedLeds.length; p++) {
-            //     frame.push(getPixel(null, null, topColor[0], topColor[1],
-            //                         topColor[2], keyedLeds[p].id));
-            // }
-            // Do interpolation between the top keys and bottom keys
-            frame.push(getPixel(null, null, topColor[0], topColor[1], topColor[2], 1));
-            frame.push(getPixel(null, null, topColor[0], topColor[1], topColor[2], 87));
-            frame.push(getPixel(null, null, botColor[0], botColor[1], botColor[2], 88));
-            frame.push(getPixel(null, null, botColor[0], botColor[1], botColor[2], 119));
-            frames.push(frame.join(","));
-        }
-        animation.frames = frames;
-        return animation;
     },
 
     /**
@@ -695,10 +738,67 @@ var generators = {
     },
 
     /**
+     * Pulse the keyboard top and bottom alternating blue and green.
+     */
+    "baseTopBreath": function(color1, color2) {
+        if (!color1) {
+            color1 = [0, 255, 0];
+        }
+        if (!color2) {
+            color2 = [0, 0, 255];
+        }
+        var breathsPerMinute = 12;
+        var FRAME_DELAY = 3;
+        var secondsPerBreath = Math.round(60 / breathsPerMinute);
+        // Divide by 2 below so that the steps from one color to another is the inhale of a breath.
+        var stepsPerInhale = (secondsPerBreath * 100 / FRAME_DELAY) / 2;
+        var colorValues = Array.prototype.slice.call(arguments, 1);
+        var topColors = multiColorBleed(stepsPerInhale, sineInterpolate, color1, color2);
+        var botColors = multiColorBleed(stepsPerInhale, sineInterpolate, color2, color1);
+
+        var animation = {
+            "settings": "framedelay:" + FRAME_DELAY +
+                        ", framestretch, loop, replace:all, pfunc:interp",
+            "type": "animation",
+            "frames": []
+        };
+
+        var i, p;
+        var frames = [];
+        var frame, color;
+        for (i = 0; i < topColors.length; i++) {
+            frame = [];
+            var botColor = botColors[i];
+            var topColor = topColors[i];
+            // Do interpolation between the top keys and bottom keys
+            frame.push(getPixel(null, null, topColor[0], topColor[1], topColor[2], 1));
+            frame.push(getPixel(null, null, topColor[0], topColor[1], topColor[2], 87));
+            frame.push(getPixel(null, null, botColor[0], botColor[1], botColor[2], 88));
+            frame.push(getPixel(null, null, botColor[0], botColor[1], botColor[2], 119));
+            frames.push(frame.join(","));
+        }
+        animation.frames = frames;
+        return animation;
+    },
+
+    /**
      * Pulse the entire keyboard red.
      */
     "redPulse": function() {
         return colorPulseGenerator(240, [255, 25, 0], [0, 0, 0]);
+    },
+
+    /**
+     * Pulse the entire keyboard between colors, linearly.
+     */
+    "linearPulse": function(hiColor, loColor) {
+        if (!hiColor) {
+            hiColor = [255, 25, 0];
+        }
+        if (!loColor) {
+            loColor = [0, 0, 0];
+        }
+        return colorPulseGenerator(240, hiColor, loColor);
     },
 
     /**
