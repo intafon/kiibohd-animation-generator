@@ -166,6 +166,7 @@ function main() {
         }
     }
     var animNames = Object.keys(animOrig);
+    var aniMappingText = ['Animations are mapped to the following keys:'];
     for (i = 0; i < animNames.length; i++) {
         var iKey = triggerKeys[i];
 
@@ -189,7 +190,10 @@ function main() {
             obj.action = "A[" + animNames[a] + "](" + ss + ")";
             iKey.triggers["1"].push(obj);
         }
+        aniMappingText.push(iKey.layers["0"].key  + ": " + animNames[i]);
     }
+
+    console.info("\n" + aniMappingText.join("\n\t"));
 
 
     // Change out some of the headers
@@ -199,9 +203,10 @@ function main() {
     json.header.Variant = "kiianigen_animations_" + generator;
     json.header.Layout = (json.header.Layout + " + Kiianigen " +
                           (generator[0].toUpperCase() + generator.substring(1)));
+    json.header.KiianigenKeyMap = aniMappingText;
 
     var newFileName = "KType-" + dateFormat(theDate, "yyyymmdd-HHMMss") + "-" + generator;
-    console.info("newfilename", newFileName);
+    // console.info("newfilename", newFileName);
 
     var jsonOutDir = "./json_out";
     if (!fs.existsSync(jsonOutDir)){
@@ -209,8 +214,10 @@ function main() {
     }
     fs.writeFileSync(jsonOutDir + '/' + newFileName + '.json', JSON.stringify(json, null, 4));
 
-    console.info("move output to KType-Standard.json and run 'dfu-util " +
-                 "-D kiibohd.dfu.bin' to flash keyboard");
+    console.info("\nNew config json has been saved to file: " + newFileName);
+
+    // console.info("move output to KType-Standard.json and run 'dfu-util " +
+    //              "-D kiibohd.dfu.bin' to flash keyboard");
 }
 
 /**
@@ -839,7 +846,7 @@ var generators = {
             "type": "animation",
             "frames": []
         };
-        console.info("whitenoise");
+        // console.info("whitenoise");
         var frames = [];
         if (!maxFrames) {
             maxFrames = 20;
