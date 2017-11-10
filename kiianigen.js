@@ -130,7 +130,6 @@ function main() {
         maxCol = Math.max(maxCol, px.Col);
     }
 
-
     if (generator === 'all') {
         for (var g in generators) {
             if (g.indexOf('!') === -1) {
@@ -475,6 +474,20 @@ function normColor(colorVal) {
     return Math.max(Math.min(Math.round(colorVal), 255), 0);
 }
 
+/**
+ * Takes a frame array of pixel values that use pixel ids (this does not work with row column
+ * defined pixels), and sorts them based on pixel id.
+ *
+ * @param  {Array} frame
+ *         An array of pixels defined using pixel id.
+ */
+function sortPixelFrame(frame) {
+    frame.sort(function(a, b) {
+        return parseInt((a).match(/\[(\d+)\]/)[1], 10) -
+            parseInt((b).match(/\[(\d+)\]/)[1], 10);
+    });
+}
+
 
 // The generators are an object map of animation generators.
 var generators = {
@@ -515,87 +528,116 @@ var generators = {
     /**
      * Makes your keyboard look vaguely like Kitt 200 from Knight Rider.
      */
-    "kitt2000": function(hiColor, bgColor) {
+    "kitt2000": function(hiColor, bgColor, width) {
+        // console.info(arguments);
         if (!hiColor) {
             hiColor = [255, 0, 0];
         }
         if (!bgColor) {
             bgColor = [0, 0, 0];
         }
+        if (width === undefined) {
+            width = 5;
+        }
 
         var animation = {
-            "settings": "framedelay:3, framestretch, loop, replace:all, pfunc:interp",
+            "settings": "framedelay:2, framestretch, loop, replace:all, pfunc:interp",
             "type": "animation",
             "frames": []
         };
         // Number of columns over which to bleed to bg color.
-        var bleed = 5;
+        var bleed = width;
         var bleedColors = colorBleed(hiColor, bgColor, bleed);
+        bleedColors.shift();
+        var reversedBleedColors = bleedColors.slice(0).reverse();
         var lastBleedColor = colorBleed(hiColor, bgColor, bleed, bleed - 1);
 
         var frames = [];
         var steps = 50;
         var step = 100 / steps;
-        var overflow = 1; //step
-        var frame;
-        var j;
-        for (var i = -overflow; i < steps + overflow + 1; i++) {
-            frame = [];
-            frame.push(getPixel(null, -2 + "%", bgColor[0], bgColor[1], bgColor[2]));
-            frame.push(getPixel(null,
-                                ((i - overflow - (bleed - 1)) * step) + "%",
-                                lastBleedColor[0],
-                                lastBleedColor[1],
-                                lastBleedColor[2]));
-            frame.push(getPixel(null,
-                                ((i - overflow) * step) + "%",
-                                hiColor[0],
-                                hiColor[1],
-                                hiColor[2]));
-            frame.push(getPixel(null,
-                                ((i - overflow + (bleed - 1)) * step) + "%",
-                                lastBleedColor[0],
-                                lastBleedColor[1],
-                                lastBleedColor[2]));
-            frame.push(getPixel(null,
-                                102 + "%",
-                                bgColor[0],
-                                bgColor[1],
-                                bgColor[2]));
-
-            frames.push(frame.join(","));
+        var overflow = 1; // steps beyond which to go off the board
+        var columns = [];
+        var columnOverflowAdjustment = -1;
+        var minColumn = 0;// - ((bleed + columnOverflowAdjustment) * step);
+        var maxColumn = 102;// + ((bleed + columnOverflowAdjustment) * step);
+        var column = minColumn;
+        while (column <= maxColumn) {
+            columns.push(column);
+            column += step;
         }
-        for (i = steps + overflow + 1; i > -overflow - 1; i--) {
-            frame = [];
+        // console.info(columns);
 
-            frame.push(getPixel(null, -
-                                2 + "%",
-                                bgColor[0],
-                                bgColor[1],
-                                bgColor[2]));
+        function createKitt2000Frame(i) {
+            var col, j;
+            var frame = [];
             frame.push(getPixel(null,
-                                ((i - overflow - (bleed - 1)) * step) + "%",
-                                lastBleedColor[0],
-                                lastBleedColor[1],
-                                lastBleedColor[2]));
-            frame.push(getPixel(null,
-                                ((i - overflow) * step) + "%",
-                                hiColor[0],
-                                hiColor[1],
-                                hiColor[2]));
-            frame.push(getPixel(null,
-                                ((i - overflow + (bleed - 1)) * step) + "%",
-                                lastBleedColor[0],
-                                lastBleedColor[1],
-                                lastBleedColor[2]));
-            frame.push(getPixel(null,
-                                102 + "%",
+                                "-2%",
                                 bgColor[0],
                                 bgColor[1],
                                 bgColor[2]));
 
-            frames.push(frame.join(","));
+            if (reversedBleedColors.length - i in reversedBleedColors) {
+                frame.push(getPixel(null,
+                                    "0%",
+                                    reversedBleedColors[reversedBleedColors.length - i][0],
+                                    reversedBleedColors[reversedBleedColors.length - i][1],
+                                    reversedBleedColors[reversedBleedColors.length - i][2]));
+            } else if (reversedBleedColors.length - i < 0) {
+                frame.push(getPixel(null,
+                                    "0%",
+                                    bgColor[0],
+                                    bgColor[1],
+                                    bgColor[2]));
+                frame.push(getPixel(null,
+                                    (columns[i - reversedBleedColors.length]) + "%",
+                                    reversedBleedColors[0][0],
+                                    reversedBleedColors[0][1],
+                                    reversedBleedColors[0][2]));
+            }
+
+            frame.push(getPixel(null,
+                                columns[i] + "%",
+                                bleedColors[0][0],
+                                bleedColors[0][1],
+                                bleedColors[0][2]));
+
+            if (columns.length - i + 1 in reversedBleedColors) {
+                frame.push(getPixel(null,
+                                    "100%",
+                                    reversedBleedColors[columns.length - i + 1][0],
+                                    reversedBleedColors[columns.length - i + 1][1],
+                                    reversedBleedColors[columns.length - i + 1][2]));
+            } else if (i + reversedBleedColors.length < columns.length) {
+                frame.push(getPixel(null,
+                                    (columns[i + reversedBleedColors.length]) + "%",
+                                    reversedBleedColors[0][0],
+                                    reversedBleedColors[0][1],
+                                    reversedBleedColors[0][2]));
+                frame.push(getPixel(null,
+                                    "100%",
+                                    bgColor[0],
+                                    bgColor[1],
+                                    bgColor[2]));
+
+            }
+
+            frame.push(getPixel(null,
+                                "102%",
+                                bgColor[0],
+                                bgColor[1],
+                                bgColor[2]));
+
+            return frame;
         }
+
+        var i;
+        for (i = 0; i < columns.length; i++) {
+            frames.push(createKitt2000Frame(i).join(","));
+        }
+        for (i = columns.length - 2; i > 1; i--) {
+            frames.push(createKitt2000Frame(i).join(","));
+        }
+
         animation.frames = frames;
         return animation;
     },
@@ -741,6 +783,124 @@ var generators = {
             }
 
             frames.push(frame.join(","));
+        }
+        animation.frames = frames;
+        return animation;
+    },
+
+    /**
+     * Pulse the keyboard top and bottom alternating blue and green, with a base spin.
+     */
+    "blueGreenBaseTopBreathDart": function(color1, color2) {
+        if (!color1) {
+            color1 = [0, 255, 0];
+        }
+        if (!color2) {
+            color2 = [0, 0, 255];
+        }
+        var breathsPerMinute = 12;
+        var FRAME_DELAY = 10;//3;
+        var secondsPerBreath = 6.4;//Math.round(60 / breathsPerMinute);
+        // Divide by 2 below so that the steps from one color to another is the inhale of a breath.
+        var stepsPerInhale = (secondsPerBreath * 100 / FRAME_DELAY) / 2;
+        var colorValues = Array.prototype.slice.call(arguments, 1);
+        var topColors = multiColorBleed(stepsPerInhale, sineInterpolate, color1, color2);
+        var botColors = multiColorBleed(stepsPerInhale, sineInterpolate, color2, color1);
+
+        // 32 = secondsPerBreath * 100 / FRAME_DELAY / 2
+        // 64 = secondsPerBreath * 100 / FRAME_DELAY
+        // 64 * FRAME_DELAY = secondsPerBreath * 100
+
+        var animation = {
+            "settings": "framedelay:" + FRAME_DELAY +
+                        ", framestretch, loop, replace:all, pfunc:interp",
+            "type": "animation",
+            "frames": []
+        };
+
+        var i, p;
+        var frames = [];
+        var baseIds = [];
+        for (i = 88; i <= 119; i++) {
+            baseIds.push(i);
+        }
+
+        //                                |
+        //           105 106 107 108 109 110 111 112 114 115
+        //       104                                         116
+        //   103                                                 117
+        // --102                                                 118--
+        //   101                                                 119
+        //       100                                             88
+        //           99  98  97  96  95  94  93  92  91  90  89
+        //                                |
+
+        var ltSide = [ 94,  95,  96,  97,  98,  99,
+                      100, 101, 102, 103, 104, 105,
+                      106, 107, 108, 109, 110];
+        var rtSide = [ 94,  93,  92,  91,  90,  89,
+                       88, 119, 118, 117, 116, 115,
+                      114, 113, 112, 111, 110];
+
+        var frame, color;
+        for (i = 0; i < topColors.length; i++) {
+            frame = [];
+            var botColor = botColors[i];
+            var topColor = topColors[i];
+
+            // Do keyboard color
+            frame.push(getPixel(null, null, topColor[0], topColor[1], topColor[2], 1));
+            frame.push(getPixel(null, null, topColor[0], topColor[1], topColor[2], 87));
+            // frame.push(getPixel(null, null, botColor[0], botColor[1], botColor[2], 88));
+            // frame.push(getPixel(null, null, botColor[0], botColor[1], botColor[2], 119));
+
+            // var popped = baseIds.pop();
+            // baseIds.unshift(popped);
+            // var steps = 119 - 88;
+            var onIntensity = 1;
+            var offIntensity = 0.05;
+            for (var j = 0; j < ltSide.length; j++) {
+                var perc = j / ltSide.length;
+                if (j > ltSide.length - 4) {
+                    frame.push(getPixel(null,
+                                        null,
+                                        normColor(botColor[0] * onIntensity),
+                                        normColor(botColor[1] * onIntensity),
+                                        normColor(botColor[2] * onIntensity),
+                                        ltSide[j]));
+                    if (ltSide[j] !== 94 && ltSide[j] !== 110) {
+                        frame.push(getPixel(null,
+                                            null,
+                                            normColor(botColor[0] * onIntensity),
+                                            normColor(botColor[1] * onIntensity),
+                                            normColor(botColor[2] * onIntensity),
+                                            rtSide[j]));
+                    }
+                } else {
+                    frame.push(getPixel(null,
+                                        null,
+                                        normColor(botColor[0] * offIntensity),
+                                        normColor(botColor[1] * offIntensity),
+                                        normColor(botColor[2] * offIntensity),
+                                        ltSide[j]));
+                    if (ltSide[j] !== 94 && ltSide[j] !== 110) {
+                        frame.push(getPixel(null,
+                                            null,
+                                            normColor(botColor[0] * offIntensity),
+                                            normColor(botColor[1] * offIntensity),
+                                            normColor(botColor[2] * offIntensity),
+                                            rtSide[j]));
+                    }
+                }
+            }
+            sortPixelFrame(frame);
+            frames.push(frame.join(","));
+
+            // color the base
+            var lPop = ltSide.shift();
+            ltSide.push(lPop);
+            var rPop = rtSide.shift();
+            rtSide.push(rPop);
         }
         animation.frames = frames;
         return animation;
