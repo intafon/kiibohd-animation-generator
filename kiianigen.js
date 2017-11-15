@@ -155,13 +155,22 @@ function main() {
     // application. If you want this stuff to happen on a different layer or with different
     // keys, change triggerLayer and keys below.
     var triggerLayer = "1";
-    var keys = "QWERTYUIOPASDFGHJKLZXCVBNM";
+    // Use scan code for finding the keys. On querty keyboards these keys map to:
+    // qwertyuiop[]\
+    // asdfghjkl;'
+    // zxcvbnm,./
+    // Scan codes 0x25-0x30, 0x37-0x41, 0x47-0x4F
+    var keyCodes = ["0x25", "0x26", "0x27", "0x28", "0x29", "0x2A", "0x2B", "0x2C",
+                        "0x2D", "0x2E", "0x2F", "0x30",
+                    "0x37", "0x38", "0x39", "0x3A", "0x3B", "0x3C", "0x3D", "0x3E",
+                        "0x3F", "0x40", "0x41",
+                    "0x47", "0x48", "0x49", "0x4A", "0x4B", "0x4C", "0x4D", "0x4E", "0x4F"];
     var triggerKeys = [];
     var matrix = json.matrix;
 
     for (i = 0; i < matrix.length; i++) {
-        if (keys.indexOf(matrix[i].layers["0"].key) > -1) {
-            triggerKeys[keys.indexOf(matrix[i].layers["0"].key)] = matrix[i];
+        if (keyCodes.indexOf(matrix[i].code) > -1) {
+            triggerKeys[keyCodes.indexOf(matrix[i].code)] = matrix[i];
         }
     }
     var animNames = Object.keys(animOrig);
