@@ -208,7 +208,6 @@ function main() {
     var theDate = new Date();
     json.header.Author = "intafon (ryan-todd-ryan) " + dateFormat(theDate, "yyyy");
     json.header.Date = dateFormat(theDate, "yyyy-mm-dd");
-    json.header.Variant = "kiianigen_animations_" + generator;
     json.header.Layout = (json.header.Layout + " + Kiianigen " +
                           (generator[0].toUpperCase() + generator.substring(1)));
     json.header.KiianigenKeyMap = aniMappingText;
