@@ -59,6 +59,10 @@ var DEMO_CONF = {
         "Iced Cooly": {
             "generator": "dodgyPixel",
             "params": [[204, 204, 204], [0, 0, 255]]
+        },
+        "Quick RGB with Tracers": {
+            "generator": "verticalPulseWithTracers",
+            "params": [17, [255, 0, 0], [0, 255, 0], [0, 0, 255]]
         }
     },
     "activeAnimations": [
@@ -66,7 +70,8 @@ var DEMO_CONF = {
         "KITT 2000",
         "Turquoise Hexagon Sun",
         "Iced Cooly",
-        "White Noise"
+        "White Noise",
+        "Quick RGB with Tracers"
     ]
 };
 
@@ -511,6 +516,10 @@ function sortPixelFrame(frame) {
     });
 }
 
+/** Returns true if value is defined and not null. */
+function defd(val) {
+    return val !== undefined && val !== null;
+}
 
 // The generators are an object map of animation generators.
 var generators = {
@@ -812,42 +821,39 @@ var generators = {
     },
 
     /**
-     * Pulse the keyboard top and bottom alternating blue and green, with a base spin.
+     * Pulse the keyboard top and botttom with alternating colors, and display a symmetric tracer
+     * animation on the base (colors start on bottom front and wrap to the right and left around to
+     * the back.
+     *
+     * @param  {Number} stepsPerColor
+     *         The steps per color. If you want there to be 64 total frames, and there are 2 colors,
+     *         then this value should be 32.
+     * @param  {Array[s]} ...colors
+     *         The colors to use in the animation.
+     * @return {Object}
+     *         The animation object.
      */
-    "blueGreenBaseTopBreathDart": function(color1, color2) {
-        if (!color1) {
-            color1 = [0, 255, 0];
+    "verticalPulseWithTracers": function(stepsPerColor) {
+        if (stepsPerColor === undefined || stepsPerColor === null) {
+            stepsPerColor = 32;
         }
-        if (!color2) {
-            color2 = [0, 0, 255];
+        var colorValues = Array.prototype.slice.call(arguments, 1);
+        if (!defd(colorValues[0])) {
+            colorValues[0] = [0, 255, 0];
         }
+        if (!defd(colorValues[1])) {
+            colorValues[1] = [0, 0, 255];
+        }
+        var colorCount = colorValues.length;
+
+        var i;
         var breathsPerMinute = 12;
         var FRAME_DELAY = 10;//3;
         var secondsPerBreath = 6.4;//Math.round(60 / breathsPerMinute);
-        // Divide by 2 below so that the steps from one color to another is the inhale of a breath.
-        var stepsPerInhale = (secondsPerBreath * 100 / FRAME_DELAY) / 2;
-        var colorValues = Array.prototype.slice.call(arguments, 1);
-        var topColors = multiColorBleed(stepsPerInhale, sineInterpolate, color1, color2);
-        var botColors = multiColorBleed(stepsPerInhale, sineInterpolate, color2, color1);
 
-        // 32 = secondsPerBreath * 100 / FRAME_DELAY / 2
-        // 64 = secondsPerBreath * 100 / FRAME_DELAY
-        // 64 * FRAME_DELAY = secondsPerBreath * 100
+        var stepsPerInhale = stepsPerColor;//(secondsPerBreath * 100 / FRAME_DELAY) / 2;
 
-        var animation = {
-            "settings": "framedelay:" + FRAME_DELAY +
-                        ", framestretch, loop, replace:all, pfunc:interp",
-            "type": "animation",
-            "frames": []
-        };
-
-        var i, p;
-        var frames = [];
-        var baseIds = [];
-        for (i = 88; i <= 119; i++) {
-            baseIds.push(i);
-        }
-
+        // Set up the animation frames for the symmetrical tracers
         //                                |
         //           105 106 107 108 109 110 111 112 114 115
         //       104                                         116
@@ -857,13 +863,60 @@ var generators = {
         //       100                                             88
         //           99  98  97  96  95  94  93  92  91  90  89
         //                                |
-
         var ltSide = [ 94,  95,  96,  97,  98,  99,
                       100, 101, 102, 103, 104, 105,
                       106, 107, 108, 109, 110];
         var rtSide = [ 94,  93,  92,  91,  90,  89,
                        88, 119, 118, 117, 116, 115,
                       114, 113, 112, 111, 110];
+
+        // The steps per inhale at a minimum needs to be the 17 of the ltSide and rtSide above. This
+        // color pulsing is pretty fast as it is...
+        if (ltSide.length > stepsPerInhale) {
+            stepsPerInhale = ltSide.length;
+        }
+        // We need to sync the tracer animation so that it can complete full rounds during the
+        // entire color pulse animation.
+        var actualStepsPerInhale = stepsPerInhale;
+
+        // var pulseCount = colorCount
+        if ((colorCount * actualStepsPerInhale) % ltSide.length > 0) {
+            var currentLoops = Math.floor((colorCount *
+                                           actualStepsPerInhale) / ltSide.length);
+            var diff = (colorCount * actualStepsPerInhale) - (ltSide.length * currentLoops);
+            var addSteps = Math.ceil(diff / currentLoops);
+            for (i = 0; i < addSteps; i++) {
+                ltSide.push(null);
+                rtSide.push(null);
+            }
+            if (ltSide.length * currentLoops > actualStepsPerInhale * colorCount) {
+                stepsPerInhale = Math.round(ltSide.length * currentLoops / colorCount);
+            }
+        }
+
+        // Now set up the pulsing colors
+        // var topColors = multiColorBleed(stepsPerInhale, sineInterpolate, color1, color2);
+        // var botColors = multiColorBleed(stepsPerInhale, sineInterpolate, color2, color1);
+        var topColors = multiColorBleed.apply(null, [stepsPerInhale, sineInterpolate]
+                                              .concat(colorValues));
+        var shiftedColors = colorValues.slice(0);
+        shiftedColors.push(shiftedColors.shift());
+        var botColors = multiColorBleed.apply(null, [stepsPerInhale, sineInterpolate]
+                                              .concat(shiftedColors));
+
+        var animation = {
+            "settings": "framedelay:" + FRAME_DELAY +
+                        ", framestretch, loop, replace:all, pfunc:interp",
+            "type": "animation",
+            "frames": []
+        };
+
+        var p;
+        var frames = [];
+        var baseIds = [];
+        for (i = 88; i <= 119; i++) {
+            baseIds.push(i);
+        }
 
         var frame, color;
         for (i = 0; i < topColors.length; i++) {
@@ -874,45 +927,43 @@ var generators = {
             // Do keyboard color
             frame.push(getPixel(null, null, topColor[0], topColor[1], topColor[2], 1));
             frame.push(getPixel(null, null, topColor[0], topColor[1], topColor[2], 87));
-            // frame.push(getPixel(null, null, botColor[0], botColor[1], botColor[2], 88));
-            // frame.push(getPixel(null, null, botColor[0], botColor[1], botColor[2], 119));
 
-            // var popped = baseIds.pop();
-            // baseIds.unshift(popped);
-            // var steps = 119 - 88;
+            // Do base colors
             var onIntensity = 1;
             var offIntensity = 0.05;
             for (var j = 0; j < ltSide.length; j++) {
                 var perc = j / ltSide.length;
-                if (j > ltSide.length - 4) {
-                    frame.push(getPixel(null,
-                                        null,
-                                        normColor(botColor[0] * onIntensity),
-                                        normColor(botColor[1] * onIntensity),
-                                        normColor(botColor[2] * onIntensity),
-                                        ltSide[j]));
-                    if (ltSide[j] !== 94 && ltSide[j] !== 110) {
+                if (ltSide[j] !== null) {
+                    if (j > ltSide.length - 4) {
                         frame.push(getPixel(null,
                                             null,
                                             normColor(botColor[0] * onIntensity),
                                             normColor(botColor[1] * onIntensity),
                                             normColor(botColor[2] * onIntensity),
-                                            rtSide[j]));
-                    }
-                } else {
-                    frame.push(getPixel(null,
-                                        null,
-                                        normColor(botColor[0] * offIntensity),
-                                        normColor(botColor[1] * offIntensity),
-                                        normColor(botColor[2] * offIntensity),
-                                        ltSide[j]));
-                    if (ltSide[j] !== 94 && ltSide[j] !== 110) {
+                                            ltSide[j]));
+                        if (ltSide[j] !== 94 && ltSide[j] !== 110) {
+                            frame.push(getPixel(null,
+                                                null,
+                                                normColor(botColor[0] * onIntensity),
+                                                normColor(botColor[1] * onIntensity),
+                                                normColor(botColor[2] * onIntensity),
+                                                rtSide[j]));
+                        }
+                    } else {
                         frame.push(getPixel(null,
                                             null,
                                             normColor(botColor[0] * offIntensity),
                                             normColor(botColor[1] * offIntensity),
                                             normColor(botColor[2] * offIntensity),
-                                            rtSide[j]));
+                                            ltSide[j]));
+                        if (ltSide[j] !== 94 && ltSide[j] !== 110) {
+                            frame.push(getPixel(null,
+                                                null,
+                                                normColor(botColor[0] * offIntensity),
+                                                normColor(botColor[1] * offIntensity),
+                                                normColor(botColor[2] * offIntensity),
+                                                rtSide[j]));
+                        }
                     }
                 }
             }

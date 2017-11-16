@@ -14,6 +14,7 @@ You can now run "``node kiianigen.js conf``", which will pull in the local file 
 4. **baseTopBreath** -- this is similar to macSleepBreath, except that the colors cycle between the keyboard and the keyboard base leds. Parameters are: "params": [[high color], [low color]] -- the defaults are green and blue.
 5. **linearPulse** -- exactly like macSleepBreath, except that the algorithm used to generate the color fades is linear, rather than being based on a sine curve.
 6. **whiteNoise** -- (subject to change soon...) -- this one takes a single parameter which is: "params": [frameCount] -- where frameCount is the number of frames generated. I am thinking of also adding an optional color. Currently this simulates white noise (TV static).
+7. **verticalPulseWithTracers** -- this one pulses the colors between the top and bottom layer of the keyboard while tracers on the base start at the middle front and wrap right and left around to the back. This takes multiple parameters. "params": [stepsPerColor, ... color arrays] --The first parameter is the number of frames that it takes to transition from one color to the next. The rest of the parameters (any number) specify the 3 item color arrays that should be used. If you specify red, green, and blue color arrays, the top will start with red and animate through the colors, while the bottom will start with green and cycle through the colors.
 
 There are other generators which can be used in the conf file, but they do not currently accept parameters, so they will use whatever parameters are baked in.
 
