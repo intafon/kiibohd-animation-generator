@@ -23,6 +23,7 @@
 /* globals require, process, console */
 var fs = require("fs");
 var dateFormat = require('dateformat');
+var exec = require( 'child_process' ).exec;
 
 // Get the generator to be used.
 var generator = process.argv[2];
@@ -213,15 +214,29 @@ function main() {
     json.header.KiianigenKeyMap = aniMappingText;
 
     var newFileName = "KType-" + dateFormat(theDate, "yyyymmdd-HHMMss") + "-" + generator;
-    // console.info("newfilename", newFileName);
 
     var jsonOutDir = "./json_out";
     if (!fs.existsSync(jsonOutDir)){
         fs.mkdirSync(jsonOutDir);
     }
-    fs.writeFileSync(jsonOutDir + '/' + newFileName + '.json', JSON.stringify(json, null, 4));
+    var newFilePath = jsonOutDir + '/' + newFileName + '.json';
+    fs.writeFileSync(newFilePath, JSON.stringify(json, null, 4));
 
     console.info("\nNew config json has been saved to file: " + newFileName);
+
+    // possible values: 'darwin', 'freebsd', 'linux', 'sunos' or 'win32'
+    if (process.platform === 'darwin') {
+        var cmd = 'cat "' + newFilePath + '" | pbcopy';
+        var copier = exec(cmd,
+            function(error, stdout, stderr) {
+                if (error !== null) {
+                    console.log("\nCould not copy the json to clipboard: ", error);
+                } else {
+                    console.log("JSON copied to clipboard. Paste away!");
+                }
+            }
+        );
+    }
 
     // console.info("move output to KType-Standard.json and run 'dfu-util " +
     //              "-D kiibohd.dfu.bin' to flash keyboard");
