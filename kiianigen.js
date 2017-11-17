@@ -75,6 +75,35 @@ var DEMO_CONF = {
     ]
 };
 
+var FUNC_KEY_GROUP = [["0x01", "0x10"]];
+var LEFT_GROUP = ["0x11", "0x24", "0x36", "0x45", ["0x55", "0x57"]];
+var RIGHT_GROUP = ["0x1F", "0x31", "0x43", "0x52", ["0x59", "0x5C"]];
+var NAV_GROUP = [["0x21", "0x23"],["0x33", "0x35"]];
+var ARROW_GROUP = ["0x54", ["0x5D", "0x5F"]];
+var LETTERS_GROUP = [["0x12","0x1D"],["0x25", "0x30"], ["0x37", "0x41"],
+                     ["0x47", "0x50"]];
+var SPACE_GROUP = ["0x58"];
+var BASE_GROUP = [[88, 119]];
+var KEY_GROUPS = {
+    "FUNC_KEY_GROUP": FUNC_KEY_GROUP,
+    "LEFT_GROUP": LEFT_GROUP,
+    "LETTERS_GROUP": LETTERS_GROUP,
+    "RIGHT_GROUP": RIGHT_GROUP,
+    "SPACE_GROUP": SPACE_GROUP,
+    "NAV_GROUP": NAV_GROUP,
+    "ARROW_GROUP": ARROW_GROUP,
+    "BASE_GROUP": BASE_GROUP
+};
+
+var LEFT_BASE_LEDS =  [ 94,  95,  96,  97,  98,  99,
+                       100, 101, 102, 103, 104, 105,
+                       106, 107, 108, 109, 110];
+var RIGHT_BASE_LEDS = [ 94,  93,  92,  91,  90,  89,
+                        88, 119, 118, 117, 116, 115,
+                       114, 113, 112, 111, 110];
+var ledsByScanCode;
+var ledIdByScanCode;
+
 /**
  * The main function for the script. This basically opens a few of the files from the
  * KType-Standard directory, builds the designated animations, and writes out a json config
@@ -118,9 +147,13 @@ function main() {
 
     // Information about the leds
     leds = json.leds;
+    ledsByScanCode = {};
+    ledIdByScanCode= {};
     blankLeds = [];
     keyedLeds = [];
     for (i = 0; i < leds.length; i++) {
+        ledsByScanCode[leds[i].scanCode] = leds[i];
+        ledIdByScanCode[leds[i].scanCode] = leds[i].id;
         if (leds[i].scanCode) {
             keyedLeds.push(leds[i]);
         } else {
@@ -521,6 +554,12 @@ function defd(val) {
     return val !== undefined && val !== null;
 }
 
+function getShiftedArray(arr) {
+    var shiftedArr = arr.slice(0);
+    shiftedArr.push(shiftedArr.shift());
+    return shiftedArr;
+}
+
 // The generators are an object map of animation generators.
 var generators = {
 
@@ -820,6 +859,87 @@ var generators = {
         return animation;
     },
 
+    "keyGroupCycler": function(stepsPerColor) {
+        if (stepsPerColor === undefined || stepsPerColor === null) {
+            stepsPerColor = 16;
+        }
+        var colorValues = Array.prototype.slice.call(arguments, 1);
+        if (!defd(colorValues[0])) {
+            colorValues[0] = [0, 255, 0];
+        }
+        if (!defd(colorValues[1])) {
+            colorValues[1] = [0, 0, 255];
+        }
+        var colorCount = colorValues.length;
+
+        var animation = {
+            "settings": "framedelay:" + 10 +
+                        ", framestretch, loop, replace:all",//, pfunc:interp",
+            "type": "animation",
+            "frames": []
+        };
+
+        var curColors = colorValues.slice(0);
+        var keyGroupNames = Object.keys(KEY_GROUPS);
+        var colorArrays = {};
+        var keyGroupFrames = [];
+        var frameCount = 0;
+        for (var i = 0; i < keyGroupNames.length; i++) {
+            colorArrays[keyGroupNames[i]] = curColors.slice(0);
+            keyGroupFrames[keyGroupNames[i]] =
+                multiColorBleed.apply(null, [stepsPerColor, sineInterpolate]
+                                      .concat(colorArrays[keyGroupNames[i]]));
+            frameCount = keyGroupFrames[keyGroupNames[i]].length;
+            curColors = getShiftedArray(curColors);
+        }
+        console.info(keyGroupFrames, frameCount);
+
+        var frames = [];
+
+        function keyToId(key) {
+            if (typeof(key) === 'string') {
+                key = ledIdByScanCode[key];
+            }
+            return key;
+        }
+        // function createPixelFromKey(key, color) {
+        //     if (typeof(key) === 'string') {
+        //         key = ledIdByScanCode[key];
+        //     }
+        //     return getPixel(null, null, color[0], color[1], color[2], key);
+        // }
+
+        // XXX: using interpolation and providing key ranges here did not seem to work properly...
+        // now using explicit led assignments, which is very heavy...
+
+        for (i = 0; i < frameCount; i++) {
+            var frame = [];
+            for (var g in KEY_GROUPS) {
+                var keys = KEY_GROUPS[g];
+                var color = keyGroupFrames[g][i];
+                for (var j = 0; j < keys.length; j++) {
+                    if (Array.isArray(keys[j])) {
+                        var id0 = keyToId(keys[j][0]);
+                        var idN = keyToId(keys[j][1]);
+                        for (var k = id0; k <= idN; k++) {
+                            frame.push(getPixel(null, null, color[0], color[1], color[2], k));
+                        }
+                        // frame.push(createPixelFromKey(keys[j][0], color));
+                        // frame.push(createPixelFromKey(keys[j][1], color));
+                    } else {
+                        // frame.push(createPixelFromKey(keys[j], color));
+                        frame.push(getPixel(null, null, color[0], color[1], color[2],
+                                            keyToId(keys[j])));
+                    }
+                }
+            }
+            frames.push(frame.join(","));
+        }
+
+        animation.frames = frames;
+        return animation;
+    },
+
     /**
      * Pulse the keyboard top and botttom with alternating colors, and display a symmetric tracer
      * animation on the base (colors start on bottom front and wrap to the right and left around to
@@ -863,12 +983,8 @@ var generators = {
         //       100                                             88
         //           99  98  97  96  95  94  93  92  91  90  89
         //                                |
-        var ltSide = [ 94,  95,  96,  97,  98,  99,
-                      100, 101, 102, 103, 104, 105,
-                      106, 107, 108, 109, 110];
-        var rtSide = [ 94,  93,  92,  91,  90,  89,
-                       88, 119, 118, 117, 116, 115,
-                      114, 113, 112, 111, 110];
+        var ltSide = LEFT_BASE_LEDS.slice(0);
+        var rtSide = RIGHT_BASE_LEDS.slice(0);
 
         // The steps per inhale at a minimum needs to be the 17 of the ltSide and rtSide above. This
         // color pulsing is pretty fast as it is...
