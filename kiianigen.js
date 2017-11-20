@@ -968,7 +968,7 @@ var generators = {
 
         var i;
         var breathsPerMinute = 12;
-        var FRAME_DELAY = 10;//3;
+        var FRAME_DELAY = 5;//3;
         var secondsPerBreath = 6.4;//Math.round(60 / breathsPerMinute);
 
         var stepsPerInhale = stepsPerColor;//(secondsPerBreath * 100 / FRAME_DELAY) / 2;
