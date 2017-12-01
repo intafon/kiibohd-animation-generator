@@ -138,7 +138,7 @@ function main() {
     }
 
     // Get info about the current configuration files from KType-Standard directory.
-    if(!fs.existsSync(KTYPE_FILE)) {
+    if(!fs.existsSync(srcConfigDir + KTYPE_FILE)) {
         console.log("KType-Standard.json not found")
     } else {
       json = JSON.parse(require('fs').readFileSync(srcConfigDir + KTYPE_FILE, 'utf8'));
@@ -168,7 +168,7 @@ function main() {
 
     // Get the max pixel rows and columns
 
-    if (!fs.existsSync(kllFile)) {
+    if (!fs.existsSync(srcConfigDir + KLL_FILE)) {
       console.log("kll.json not found")
     } else {
       kll = JSON.parse(require('fs').readFileSync(srcConfigDir + KLL_FILE, 'utf8'));
