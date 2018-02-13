@@ -32,6 +32,8 @@ if (generator) {
 }
 
 var CONF_FILE = "./kiianiconf.json";
+var KTYPE_FILE = '/KType-Standard.json';
+var KLL_FILE = '/kll.json';
 
 var maxRow = 0;
 var maxCol = 0;
@@ -136,8 +138,11 @@ function main() {
     }
 
     // Get info about the current configuration files from KType-Standard directory.
-    json = JSON.parse(require('fs')
-                          .readFileSync(srcConfigDir + '/KType-Standard.json', 'utf8'));
+    if(!fs.existsSync(srcConfigDir + KTYPE_FILE)) {
+        console.log("KType-Standard.json not found")
+    } else {
+      json = JSON.parse(require('fs').readFileSync(srcConfigDir + KTYPE_FILE, 'utf8'));
+    }
 
     // The current animations
     if (!json.animations) {
@@ -162,7 +167,12 @@ function main() {
     }
 
     // Get the max pixel rows and columns
-    kll = JSON.parse(require('fs').readFileSync(srcConfigDir + '/kll.json', 'utf8'));
+
+    if (!fs.existsSync(srcConfigDir + KLL_FILE)) {
+      console.log("kll.json not found")
+    } else {
+      kll = JSON.parse(require('fs').readFileSync(srcConfigDir + KLL_FILE, 'utf8'));
+    }
     for (var pxi in kll.PixelIds) {
         var px = kll.PixelIds[pxi];
         maxRow = Math.max(maxRow, px.Row);
