@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 /**
  * Usage:
  * node kiianigen.js {generator name} {ktype standard dir}
@@ -213,7 +215,9 @@ function main() {
                         "0x2D", "0x2E", "0x2F", "0x30",
                     "0x37", "0x38", "0x39", "0x3A", "0x3B", "0x3C", "0x3D", "0x3E",
                         "0x3F", "0x40", "0x41",
-                    "0x47", "0x48", "0x49", "0x4A", "0x4B", "0x4C", "0x4D", "0x4E", "0x4F"];
+        "0x47", "0x48", "0x49", "0x4A", "0x4B", "0x4C", "0x4D", "0x4E", "0x4F", "0x50"];
+    // Reverse the keyCodes array so the first keys are nearest the bottom right.
+    keyCodes.reverse();
     var triggerKeys = [];
     var matrix = json.matrix;
 
@@ -234,18 +238,12 @@ function main() {
         };
 
         // Set the triggers for toggling off/on the animations
-        iKey.triggers = {};
-        iKey.triggers[triggerLayer] = [];
         for (var a = 0; a < animNames.length; a++) {
-            var obj = {
-                type: "animation",
-                label: "",
-                action: ""
-            };
             var ss = (a === i) ? "start" : "stop";
-            obj.label = ss + " '" + animNames[a] + "' animation";
-            obj.action = "A[" + animNames[a] + "](" + ss + ")";
-            iKey.triggers["1"].push(obj);
+            if (a === i) {
+                iKey.layers[triggerLayer].key = `#:A[${animNames[a]}](start)`;
+                iKey.layers[triggerLayer].label = `start '${animNames[a]}' animation`;
+            }
         }
         aniMappingText.push(iKey.layers["0"].key  + ": " + animNames[i]);
     }
@@ -257,8 +255,8 @@ function main() {
     var theDate = new Date();
     json.header.Author = "intafon (ryan-todd-ryan) " + dateFormat(theDate, "yyyy");
     json.header.Date = dateFormat(theDate, "yyyy-mm-dd");
-    json.header.Layout = (json.header.Layout + " + Kiianigen " +
-                          (generator[0].toUpperCase() + generator.substring(1)));
+    // json.header.Layout = (json.header.Layout + " + Kiianigen " +
+    //                       (generator[0].toUpperCase() + generator.substring(1)));
     json.header.KiianigenKeyMap = aniMappingText;
 
     var newFileName = "KType-" + dateFormat(theDate, "yyyymmdd-HHMMss") + "-" + generator;
@@ -486,8 +484,8 @@ function colorPulseGenerator(frameCountPerColor) {
     var colors = multiColorBleed.apply(null, [frameCountPerColor, undefined].concat(args));
 
     var animation = {
-        "settings": "framedelay:3, framestretch, loop, replace:all, pfunc:interp",
-        "type": "animation",
+        "settings": "framedelay:3, framestretch, loop, replace:clear, pfunc:interp",
+        "type": "custom",
         "frames": []
     };
 
@@ -516,8 +514,8 @@ function colorBreatheGenerator(breathsPerMinute) {
     var colors = multiColorBleed.apply(null, [stepsPerInhale, sineInterpolate].concat(colorValues));
 
     var animation = {
-        "settings": "framedelay:" + FRAME_DELAY + ", framestretch, loop, replace:all, pfunc:interp",
-        "type": "animation",
+        "settings": "framedelay:" + FRAME_DELAY + ", framestretch, loop, replace:clear, pfunc:interp",
+        "type": "custom",
         "frames": []
     };
 
@@ -605,8 +603,8 @@ var generators = {
             bgColor = [25, 25, 25];
         }
         var animation = {
-            "settings": "framedelay:1, loop, replace:all",
-            "type": "animation",
+            "settings": "framedelay:1, loop, replace:clear",
+            "type": "custom",
             "frames": []
         };
         var frames = [];
@@ -643,8 +641,8 @@ var generators = {
         }
 
         var animation = {
-            "settings": "framedelay:2, framestretch, loop, replace:all, pfunc:interp",
-            "type": "animation",
+            "settings": "framedelay:2, framestretch, loop, replace:clear, pfunc:interp",
+            "type": "custom",
             "frames": []
         };
         // Number of columns over which to bleed to bg color.
@@ -750,8 +748,8 @@ var generators = {
      */
     "bluewipe": function(maxFrames) {
         var animation = {
-            "settings": "framedelay:3, framestretch, loop, replace:all, pfunc:interp",
-            "type": "animation",
+            "settings": "framedelay:3, framestretch, loop, replace:clear, pfunc:interp",
+            "type": "custom",
             "frames": []
         };
         var bgColor = [93, 93, 93];
@@ -847,8 +845,8 @@ var generators = {
 
         var animation = {
             "settings": "framedelay:" + FRAME_DELAY +
-                        ", framestretch, loop, replace:all, pfunc:interp",
-            "type": "animation",
+                        ", framestretch, loop, replace:clear, pfunc:interp",
+            "type": "custom",
             "frames": []
         };
 
@@ -905,8 +903,8 @@ var generators = {
 
         var animation = {
             "settings": "framedelay:" + 10 +
-                        ", framestretch, loop, replace:all",//, pfunc:interp",
-            "type": "animation",
+                        ", framestretch, loop, replace:clear",//, pfunc:interp",
+            "type": "custom",
             "frames": []
         };
 
@@ -1059,8 +1057,8 @@ var generators = {
 
         var animation = {
             "settings": "framedelay:" + FRAME_DELAY +
-                        ", framestretch, loop, replace:all, pfunc:interp",
-            "type": "animation",
+                        ", framestretch, loop, replace:clear, pfunc:interp",
+            "type": "custom",
             "frames": []
         };
 
@@ -1154,8 +1152,8 @@ var generators = {
 
         var animation = {
             "settings": "framedelay:" + FRAME_DELAY +
-                        ", framestretch, loop, replace:all, pfunc:interp",
-            "type": "animation",
+                        ", framestretch, loop, replace:clear, pfunc:interp",
+            "type": "custom",
             "frames": []
         };
 
@@ -1229,8 +1227,8 @@ var generators = {
      */
     "whiteNoise": function(maxFrames) {
         var animation = {
-            "settings": "framedelay:1, loop, replace:all",
-            "type": "animation",
+            "settings": "framedelay:1, loop, replace:clear",
+            "type": "custom",
             "frames": []
         };
         // console.info("whitenoise");
@@ -1261,8 +1259,8 @@ var generators = {
     "topAndBottom": function() {
         var i;
         var animation = {
-            "settings": "framedelay:5, loop, replace:all",
-            "type": "animation",
+            "settings": "framedelay:5, loop, replace:clear",
+            "type": "custom",
             "frames": []
         };
         var frames = [];
@@ -1285,8 +1283,8 @@ var generators = {
     "topAndBottom2": function() {
         var i;
         var animation = {
-            "settings": "framedelay:5, loop, replace:all, pfunc:interp",
-            "type": "animation",
+            "settings": "framedelay:5, loop, replace:clear, pfunc:interp",
+            "type": "custom",
             "frames": []
         };
         var topColor = [0,255,0];
@@ -1328,8 +1326,8 @@ var generators = {
      */
     "escapeTest": function() {
         var animation = {
-            "settings": "framedelay:1, loop, replace:all",
-            "type": "animation",
+            "settings": "framedelay:1, loop, replace:clear",
+            "type": "custom",
             "frames": []
         };
         var frames = [];
